@@ -1,0 +1,157 @@
+{
+  "name": "WhatsApp text",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "7326df81-cc3e-46bc-8c85-c2d736e18881",
+      "name": "Messaggio WhatsApp ricevuto",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        64
+      ],
+      "webhookId": "cb0ab710-4c7f-4f17-8e3c-ebb298f401b2"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ String(\"1502000822988503\") }}",
+        "recipientPhoneNumber": "={{ String(\"393890987618\") }}",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "id": "68965893-e09f-4b2e-99fb-7aa6988ef771",
+      "name": "Rispondi su WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        64
+      ],
+      "webhookId": "f8f01c1a-fe8e-488a-a7e5-6600ad2b04d6",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "agentId": {
+          "__rl": true,
+          "value": "yBUq4773jDDtWHuQ",
+          "mode": "list",
+          "cachedResultName": "Spotter AI"
+        },
+        "message": "={{ $json.message }}",
+        "advanced": {
+          "invokeMode": "perItem",
+          "session": {
+            "session": {
+              "sessionIdType": "customKey",
+              "sessionKey": "={{ 'whatsapp-' + $('Messaggio WhatsApp ricevuto').item.json.messages[0].from }}"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.messageAnAgent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "fe30dd20-9fa9-4c38-8f76-70791f18fc20",
+      "name": "Message an Agent"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "29eB7hdxkKlW6wIw",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/29eB7hdxkKlW6wIw",
+          "cachedResultName": "whatsapp media"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "messages"
+          ],
+          "schema": [
+            {
+              "id": "messages",
+              "displayName": "messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        64
+      ],
+      "id": "503d35ab-78b1-4a11-8e69-71260fafe4f5",
+      "name": "Call 'whatsapp media'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Messaggio WhatsApp ricevuto": {
+      "main": [
+        [
+          {
+            "node": "Call 'whatsapp media'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message an Agent": {
+      "main": [
+        [
+          {
+            "node": "Rispondi su WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'whatsapp media'": {
+      "main": [
+        [
+          {
+            "node": "Message an Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0ae893be-0fa9-4b16-8d1d-0e2ce8acc4f7",
+  "meta": {
+    "instanceId": "98d14b6c1043deb3e7403330073279ecb2dfca84f382009302dbb5dba3b977f2"
+  },
+  "nodeGroups": [],
+  "id": "Dmz2SkD52s1w0tiS",
+  "tags": []
+}

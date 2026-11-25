@@ -1,0 +1,581 @@
+{
+  "name": "whatsapp media",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.messages?.[0]?.type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "139ee79a-0d2b-4135-ab0b-6b07873f3c7b",
+      "name": "Solo messaggi in arrivo",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ['audio', 'image', 'document'].includes($json.messages[0].type) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9264dddb-8115-4845-acc5-f532afe4035c",
+      "name": "Contiene un file?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $json.messages[0][$json.messages[0].type].id }}"
+      },
+      "id": "5fb1257f-5038-4b7f-9beb-3ed9bb39e15e",
+      "name": "Recupera link del file",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        512
+      ],
+      "webhookId": "521a7725-9182-4f7b-94bd-102e5c4832a4"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "d75ac486-967d-4e17-a1c8-3bfc01a7a85d",
+      "name": "Scarica il file",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Start').item.json.messages[0].type }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Start').item.json.messages[0].type }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Immagine"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Start').item.json.messages[0].document?.mime_type || '' }}",
+                    "rightValue": "application/pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ /^(text\\/|application\\/(json|csv|xml))/.test($('Start').item.json.messages[0].document?.mime_type || '') }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "File di testo"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Altro file"
+        }
+      },
+      "id": "2b9be133-79f4-4e9c-89fb-06f73bd4155f",
+      "name": "Tipo di file",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1104,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {
+          "language": "it"
+        }
+      },
+      "id": "5b96f39d-3038-4fea-979e-aed164a49c5f",
+      "name": "Trascrivi audio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1552,
+        128
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5.4-mini",
+          "cachedResultName": "GPT-5.4-MINI"
+        },
+        "text": "Descrivi in dettaglio questa immagine inviata da un atleta al suo coach (es. pasto, etichetta, screenshot di allenamento, infortunio, postura). Trascrivi eventuali testi o numeri visibili.",
+        "inputType": "base64",
+        "simplify": false,
+        "options": {
+          "maxTokens": 2000
+        }
+      },
+      "id": "68d2cf17-c095-4270-b43d-77aef9f4744b",
+      "name": "Descrivi immagine",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1328,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "img-1",
+              "name": "text",
+              "value": "={{ (() => { const msg = ($json.output || []).find(o => o.type === 'message'); const part = msg ? (msg.content || []).find(c => c.type === 'output_text') : null; return part ? part.text : ''; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1068bc06-9843-4a9d-90d6-c4ee563ec08d",
+      "name": "Testo della descrizione",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1552,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {
+          "joinPages": true
+        }
+      },
+      "id": "413adf55-b3b5-43a2-98bd-0278f7d76412",
+      "name": "Leggi PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "id": "8d393bd8-ff5c-4b23-9a93-935b5cd624a7",
+      "name": "Leggi file di testo",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-1",
+              "name": "message",
+              "value": "={{ (() => {\n  const m = $('Start').item.json.messages[0];\n  const t = m.type;\n  const media = m[t] || {};\n  const caption = media.caption ? '\\nMessaggio allegato: ' + media.caption : '';\n  if (t === 'text') return m.text.body;\n  if (t === 'audio') return \"[L'atleta ha inviato un messaggio vocale. Trascrizione]\\n\" + ($json.text || '');\n  if (t === 'image') {\n    return \"[L'atleta ha inviato un'immagine. Descrizione]\\n\" + ($json.text || '') + caption;\n  }\n  if (t === 'document') {\n    const content = String($json.text || '').slice(0, 20000);\n    if (content) return \"[L'atleta ha inviato il file \" + (media.filename || '') + '. Contenuto]\\n' + content + caption;\n    return \"[L'atleta ha inviato il file \" + (media.filename || '') + \" (\" + (media.mime_type || '') + \"), ma il formato non si puo leggere. Chiedigli di inviarlo come PDF, testo o foto.]\" + caption;\n  }\n  return \"[L'atleta ha inviato un contenuto di tipo \" + t + \" che non si puo leggere. Chiedigli di scriverlo o inviarlo come testo, vocale, foto o PDF.]\";\n})() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c2cd335-aa13-4b2d-a8cf-e63040ecf45a",
+      "name": "Prepara messaggio per il coach",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1776,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd600fec-5632-420e-999d-2ae5da81d799",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1984,
+        560
+      ],
+      "id": "7bece3fb-a789-472f-8025-c2ba78e07d63",
+      "name": "Return"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "messages",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "id": "80db8fef-be20-4de8-9094-9dff3230c814",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Solo messaggi in arrivo": {
+      "main": [
+        [
+          {
+            "node": "Contiene un file?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contiene un file?": {
+      "main": [
+        [
+          {
+            "node": "Recupera link del file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recupera link del file": {
+      "main": [
+        [
+          {
+            "node": "Scarica il file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scarica il file": {
+      "main": [
+        [
+          {
+            "node": "Tipo di file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo di file": {
+      "main": [
+        [
+          {
+            "node": "Trascrivi audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Descrivi immagine",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi file di testo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trascrivi audio": {
+      "main": [
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descrivi immagine": {
+      "main": [
+        [
+          {
+            "node": "Testo della descrizione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testo della descrizione": {
+      "main": [
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi PDF": {
+      "main": [
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi file di testo": {
+      "main": [
+        [
+          {
+            "node": "Prepara messaggio per il coach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Solo messaggi in arrivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara messaggio per il coach": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d2ef299a-3db8-41e7-b376-22042192e9c3",
+  "meta": {
+    "instanceId": "98d14b6c1043deb3e7403330073279ecb2dfca84f382009302dbb5dba3b977f2"
+  },
+  "nodeGroups": [],
+  "id": "29eB7hdxkKlW6wIw",
+  "tags": []
+}

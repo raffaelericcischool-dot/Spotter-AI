@@ -1,0 +1,173 @@
+{
+  "name": "Scheduling Agent",
+  "model": "google/gemini-3.8-flash",
+  "instructions": "You are the Scheduling specialist of a personal AI coach for athletes. You are called by the orchestrator with a structured summary, relevant profile facts and constraints. Reply in the language of the request. The athlete's timezone is Europe/Rome unless told otherwise.\n\nScope: organise training sessions, rest days, physio or medical appointments, meals and sleep windows around the athlete's work or study, travel, competitions, training load and recovery.\n\nGoogle Calendar tools (primary calendar):\n- Before proposing a plan, read the existing events with `list_calendar_events` and check slots with `check_calendar_availability`, so you never double-book.\n- Create or move events with `create_calendar_event` and `update_calendar_event` only when the orchestrator or the athlete explicitly asked to put them in the calendar. Both tools need the athlete's approval. Otherwise present the plan as a proposal.\n- Never delete events. Do not invite other people. Keep event descriptions free of sensitive medical details.\n- If a calendar tool fails or has no credential, say so and fall back to a proposal.\n\nRules:\n- Use only the constraints, calendar data and schedule you were given. If availability, dates or deadlines are missing, list exactly what is needed and propose a provisional plan.\n- Protect recovery: no hard sessions back-to-back when recovery is poor, keep at least one rest day per week, avoid late hard sessions before key sleep.\n- Use explicit dates and times (day, date, start-end) in a clear list.\n\nReturn exactly: 1) proposed schedule (and which events were created or changed in Google Calendar, if any), 2) assumptions and open questions, 3) `sources` list (the constraints and calendar events used; empty list if none), 4) any safety concern for the supervisor.",
+  "tools": [
+    {
+      "type": "node",
+      "name": "list_calendar_events",
+      "description": "List the athlete's Google Calendar events in a time range, to see existing commitments before proposing a plan.",
+      "node": {
+        "nodeType": "n8n-nodes-base.googleCalendarTool",
+        "nodeTypeVersion": 1.4,
+        "nodeParameters": {
+          "descriptionType": "auto",
+          "resource": "event",
+          "operation": "getAll",
+          "calendar": {
+            "__rl": true,
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Calendar', ``, 'string') }}",
+            "mode": "id"
+          },
+          "returnAll": false,
+          "limit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('limit', 'Max number of events to return', 'number') }}",
+          "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMin', 'Start of the range, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMax', 'End of the range, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "options": {
+            "orderBy": "startTime"
+          },
+          "useN8nTimeZone": ""
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "JU90m5lSXu19Llge",
+            "name": "Google Calendar account"
+          }
+        }
+      }
+    },
+    {
+      "type": "node",
+      "name": "check_calendar_availability",
+      "description": "Check whether a time slot is free in the athlete's Google Calendar.",
+      "node": {
+        "nodeType": "n8n-nodes-base.googleCalendarTool",
+        "nodeTypeVersion": 1.4,
+        "nodeParameters": {
+          "descriptionType": "auto",
+          "resource": "calendar",
+          "operation": "availability",
+          "calendar": {
+            "__rl": true,
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Calendar', ``, 'string') }}",
+            "mode": "id"
+          },
+          "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMin', 'Start of the slot, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMax', 'End of the slot, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "options": {
+            "outputFormat": "availability",
+            "timezone": {
+              "__rl": true,
+              "mode": "id",
+              "value": "Europe/Rome"
+            }
+          },
+          "useN8nTimeZone": ""
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "JU90m5lSXu19Llge",
+            "name": "Google Calendar account"
+          }
+        }
+      }
+    },
+    {
+      "type": "node",
+      "name": "create_calendar_event",
+      "description": "Create an event (training, rest, appointment, meal or sleep window) in the athlete's Google Calendar.",
+      "node": {
+        "nodeType": "n8n-nodes-base.googleCalendarTool",
+        "nodeTypeVersion": 1.4,
+        "nodeParameters": {
+          "descriptionType": "auto",
+          "resource": "event",
+          "operation": "create",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Calendar', ``, 'string') }}"
+          },
+          "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start', 'Event start, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end', 'Event end, ISO 8601 with Europe/Rome offset', 'string') }}",
+          "useDefaultReminders": true,
+          "additionalFields": {
+            "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('description', 'Short event description or notes', 'string') }}",
+            "sendUpdates": "none",
+            "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('summary', 'Event title', 'string') }}"
+          },
+          "useN8nTimeZone": ""
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "JU90m5lSXu19Llge",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      "requireApproval": true
+    },
+    {
+      "type": "node",
+      "name": "update_calendar_event",
+      "description": "Move or edit an existing Google Calendar event, given its event ID.",
+      "node": {
+        "nodeType": "n8n-nodes-base.googleCalendarTool",
+        "nodeTypeVersion": 1.4,
+        "nodeParameters": {
+          "descriptionType": "auto",
+          "resource": "event",
+          "operation": "update",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Calendar', ``, 'string') }}"
+          },
+          "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('eventId', 'ID of the event to update', 'string') }}",
+          "useDefaultReminders": true,
+          "updateFields": {
+            "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end', 'New end, ISO 8601 with Europe/Rome offset', 'string') }}",
+            "sendUpdates": "none",
+            "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start', 'New start, ISO 8601 with Europe/Rome offset', 'string') }}",
+            "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('summary', 'New event title', 'string') }}"
+          },
+          "useN8nTimeZone": ""
+        },
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "JU90m5lSXu19Llge",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      "requireApproval": true
+    }
+  ],
+  "personalisation": {
+    "icon": "calendar-check",
+    "gradient": {
+      "from": "#8E82FF",
+      "to": "#AFAF17",
+      "angle": 213,
+      "fromStop": 18,
+      "toStop": 95
+    }
+  },
+  "credential": "KT5razrVzqVt7ecD",
+  "description": "Specialist in planning training, rest and appointments around the athlete's constraints, load and recovery.",
+  "memory": {
+    "enabled": true,
+    "storage": "n8n",
+    "observationalMemory": {
+      "enabled": true
+    }
+  },
+  "providerTools": {},
+  "config": {
+    "webSearch": {
+      "enabled": false
+    }
+  },
+  "skills": [],
+  "integrations": []
+}

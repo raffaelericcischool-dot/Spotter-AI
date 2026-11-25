@@ -1,0 +1,465 @@
+{
+  "name": "Athlete Coach - Google Health sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 23,
+              "triggerAtMinute": 55
+            }
+          ]
+        }
+      },
+      "id": "c5008ab5-bf2c-44a2-aee8-05838e434a16",
+      "name": "End of day sync",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -80,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "wearable_samples",
+        "limit": 1,
+        "orderBy": "recorded_at.desc",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "source",
+              "condition": "eq",
+              "keyValue": "google_health"
+            }
+          ]
+        }
+      },
+      "id": "882d248c-844b-4d85-9c8e-67a96e892391",
+      "name": "Get last synced sample",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -336
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lq2CheQRXOHRK9ti",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tz = 'Europe/Rome';\nconst now = DateTime.now().setZone(tz);\nconst rows = $input.all().filter(i => i.json && i.json.recorded_at);\nlet start = rows.length\n  ? DateTime.fromISO(rows[0].json.recorded_at).setZone(tz).startOf('day')\n  : now.minus({ days: 7 }).startOf('day');\n// Google Health caps heart-rate, total-calories and active-minutes roll-ups at 14 days per request\nconst earliest = now.minus({ days: 13 }).startOf('day');\nif (start < earliest) start = earliest;\nconst end = now.plus({ days: 1 }).startOf('day');\nconst civil = d => ({ date: { year: d.year, month: d.month, day: d.day }, time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 } });\nconst BASE = 'https://health.googleapis.com/v4/users/me/dataTypes/';\nconst rollup = (metric, dataType) => ({\n  metric,\n  kind: 'rollup',\n  method: 'POST',\n  url: BASE + dataType + '/dataPoints:dailyRollUp',\n  body: { range: { start: civil(start), end: civil(end) }, windowSizeDays: 1, pageSize: 14 },\n});\nconst list = (metric, dataType, filter, pageSize) => ({\n  metric,\n  kind: 'list',\n  method: 'GET',\n  url: BASE + dataType + '/dataPoints?pageSize=' + pageSize + '&filter=' + encodeURIComponent(filter),\n  body: {},\n});\nconst startDate = start.toISODate();\nconst startUtc = start.toUTC().toISO({ suppressMilliseconds: true });\nconst requests = [\n  rollup('steps', 'steps'),\n  rollup('distance', 'distance'),\n  rollup('calories', 'total-calories'),\n  rollup('active_minutes', 'active-minutes'),\n  rollup('active_zone_minutes', 'active-zone-minutes'),\n  rollup('heart_rate', 'heart-rate'),\n  rollup('weight', 'weight'),\n  list('resting_heart_rate', 'daily-resting-heart-rate', 'daily_resting_heart_rate.date >= \"' + startDate + '\"', 100),\n  list('hrv', 'daily-heart-rate-variability', 'daily_heart_rate_variability.date >= \"' + startDate + '\"', 100),\n  list('sleep', 'sleep', 'sleep.interval.end_time >= \"' + startUtc + '\"', 25),\n  list('exercise', 'exercise', 'exercise.interval.civil_start_time >= \"' + startDate + '\"', 25),\n];\nreturn requests.map(r => ({ json: { ...r, window_start: start.toUTC().toISO(), window_end: now.toUTC().toISO() } }));"
+      },
+      "id": "76b69b2e-633e-4bef-a5ff-3dc19dc6d673",
+      "name": "Build sync window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "rollup",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e61e464f-e362-423e-87c8-7f8deda68ce0",
+      "name": "Is daily roll-up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7f118552-b60a-4355-b0cb-14148e6d0de6",
+      "name": "Fetch daily roll-ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1056,
+        -320
+      ],
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "Uf9w6mJmfaG6hee6",
+          "name": "Google account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "33ff835f-c1fc-485c-9242-d7a3d9eb5781",
+      "name": "Collect responses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1280,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "747e079b-bcf6-4834-a2b4-5abe6f43c209",
+      "name": "Fetch health records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1056,
+        -144
+      ],
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "Uf9w6mJmfaG6hee6",
+          "name": "Google account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tz = 'Europe/Rome';\nconst reqs = $('Build sync window').all().map(i => i.json);\nconst rollReqs = reqs.filter(r => r.kind === 'rollup');\nconst listReqs = reqs.filter(r => r.kind === 'list');\nconst pairs = [];\n$('Fetch daily roll-ups').all().forEach((r, i) => pairs.push([rollReqs[i], r.json]));\n$('Fetch health records').all().forEach((r, i) => pairs.push([listReqs[i], r.json]));\nconst nowMs = Date.now();\nconst out = [];\nconst round = v => Math.round(Number(v) * 100) / 100;\nconst add = (metric, value, unit, startIso, endIso, details) => {\n  if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) return;\n  const endMs = Math.min(new Date(endIso).getTime(), nowMs);\n  out.push({\n    athlete_id: 'athlete',\n    source: 'google_health',\n    metric,\n    value: round(value),\n    unit,\n    details: details || null,\n    period_start: new Date(startIso).toISOString(),\n    recorded_at: new Date(endMs).toISOString(),\n  });\n};\nconst dayStart = d => DateTime.fromObject({ year: d.year, month: d.month, day: d.day }, { zone: tz });\nconst secs = s => Number(String(s || '0').replace('s', ''));\n\npairs.forEach(([req, json]) => {\n  const body = json || {};\n  if (!req || body.error) return;\n  const metric = req.metric;\n  if (req.kind === 'rollup') {\n    for (const p of body.rollupDataPoints || []) {\n      const d = p.civilStartTime && p.civilStartTime.date;\n      if (!d) continue;\n      const s = dayStart(d);\n      const S = s.toISO();\n      const E = s.plus({ days: 1 }).toISO();\n      if (metric === 'steps' && p.steps) add('steps', p.steps.countSum, 'count', S, E);\n      if (metric === 'distance' && p.distance) add('distance', Number(p.distance.millimetersSum) / 1e6, 'km', S, E);\n      if (metric === 'calories' && p.totalCalories) add('calories_expended', p.totalCalories.kcalSum, 'kcal', S, E);\n      if (metric === 'active_minutes' && p.activeMinutes) {\n        const lv = p.activeMinutes.activeMinutesRollupByActivityLevel || [];\n        const total = lv.reduce((a, x) => a + Number(x.activeMinutesSum || 0), 0);\n        add('active_minutes', total, 'min', S, E, lv.map(x => x.activityLevel + ': ' + x.activeMinutesSum).join(', '));\n      }\n      if (metric === 'active_zone_minutes' && p.activeZoneMinutes) {\n        const z = p.activeZoneMinutes;\n        const fb = Number(z.sumInFatBurnHeartZone || 0);\n        const c = Number(z.sumInCardioHeartZone || 0);\n        const pk = Number(z.sumInPeakHeartZone || 0);\n        add('active_zone_minutes', fb + c + pk, 'min', S, E, 'fat_burn ' + fb + ', cardio ' + c + ', peak ' + pk);\n      }\n      if (metric === 'heart_rate' && p.heartRate) {\n        add('heart_rate_avg', p.heartRate.beatsPerMinuteAvg, 'bpm', S, E);\n        add('heart_rate_max', p.heartRate.beatsPerMinuteMax, 'bpm', S, E);\n        add('heart_rate_min', p.heartRate.beatsPerMinuteMin, 'bpm', S, E);\n      }\n      if (metric === 'weight' && p.weight) add('weight', Number(p.weight.weightGramsAvg) / 1000, 'kg', S, E);\n    }\n    return;\n  }\n  for (const dp of body.dataPoints || []) {\n    if (metric === 'resting_heart_rate' && dp.dailyRestingHeartRate && dp.dailyRestingHeartRate.date) {\n      const s = dayStart(dp.dailyRestingHeartRate.date);\n      add('resting_heart_rate', dp.dailyRestingHeartRate.beatsPerMinute, 'bpm', s.toISO(), s.plus({ days: 1 }).toISO());\n    }\n    if (metric === 'hrv' && dp.dailyHeartRateVariability && dp.dailyHeartRateVariability.date) {\n      const v = dp.dailyHeartRateVariability;\n      const s = dayStart(v.date);\n      add('hrv_avg', v.averageHeartRateVariabilityMilliseconds, 'ms', s.toISO(), s.plus({ days: 1 }).toISO());\n      add('hrv_deep_sleep_rmssd', v.deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds, 'ms', s.toISO(), s.plus({ days: 1 }).toISO());\n    }\n    if (metric === 'sleep' && dp.sleep && dp.sleep.interval) {\n      const sl = dp.sleep;\n      const S = sl.interval.startTime;\n      const E = sl.interval.endTime;\n      const sm = sl.summary || {};\n      const asleepMin = sm.minutesAsleep !== undefined ? Number(sm.minutesAsleep) : (new Date(E) - new Date(S)) / 60000;\n      add('sleep_hours', asleepMin / 60, 'h', S, E, sl.type || null);\n      add('sleep_awake_minutes', sm.minutesAwake, 'min', S, E);\n      add('sleep_minutes_to_fall_asleep', sm.minutesToFallAsleep, 'min', S, E);\n      for (const st of sm.stagesSummary || []) {\n        const t = String(st.type || '').toLowerCase();\n        if (['deep', 'rem', 'light'].includes(t)) add('sleep_' + t + '_minutes', st.minutes, 'min', S, E);\n        if (t === 'awake') add('sleep_awakenings', st.count, 'count', S, E);\n      }\n    }\n    if (metric === 'exercise' && dp.exercise && dp.exercise.interval) {\n      const ex = dp.exercise;\n      const S = ex.interval.startTime;\n      const E = ex.interval.endTime;\n      const ms = ex.metricsSummary || {};\n      const minutes = ex.activeDuration ? secs(ex.activeDuration) / 60 : (new Date(E) - new Date(S)) / 60000;\n      const parts = [ex.displayName || ex.exerciseType || 'workout'];\n      if (ex.exerciseType) parts.push('type ' + ex.exerciseType);\n      if (ms.distanceMillimeters) parts.push(round(ms.distanceMillimeters / 1e6) + ' km');\n      if (ms.caloriesKcal) parts.push(round(ms.caloriesKcal) + ' kcal');\n      if (ms.averageHeartRateBeatsPerMinute) parts.push('avg HR ' + ms.averageHeartRateBeatsPerMinute + ' bpm');\n      if (ms.activeZoneMinutes) parts.push(ms.activeZoneMinutes + ' AZM');\n      if (ms.steps) parts.push(ms.steps + ' steps');\n      add('workout_minutes', minutes, 'min', S, E, parts.join(' | '));\n    }\n  }\n});\nreturn out.map(json => ({ json }));"
+      },
+      "id": "e8b2f4ac-830d-4f9c-aef5-2ee5078fea4c",
+      "name": "Normalize samples",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "wearable_samples",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "source",
+              "condition": "eq",
+              "keyValue": "google_health"
+            },
+            {
+              "keyName": "recorded_at",
+              "condition": "gt",
+              "keyValue": "={{ $('Build sync window').first().json.window_start }}"
+            }
+          ]
+        }
+      },
+      "id": "61d4d2c6-c43d-45be-98de-2a64cfc2c197",
+      "name": "Delete stale samples in window",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        -336
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lq2CheQRXOHRK9ti",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Normalize samples').all().map(i => ({ json: i.json }));"
+      },
+      "id": "319d287b-29d0-4d3b-8ffa-6bf0fd80e2d4",
+      "name": "Restore new samples",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "wearable_samples",
+        "dataToSend": "autoMapInputData"
+      },
+      "id": "f55858b1-b70b-4210-8f02-1c90039882a2",
+      "name": "Save samples",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        -336
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "lq2CheQRXOHRK9ti",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const w = $('Build sync window').first().json;\nconst rows = $('Normalize samples').all().map(i => i.json);\nconst reqs = $('Build sync window').all().map(i => i.json);\nconst errOf = (items, list) => items.map((r, i) => (r.json && r.json.error ? (list[i] ? list[i].metric : 'request ' + i) + ': ' + String(r.json.error.message || JSON.stringify(r.json.error)).slice(0, 200) : null));\nconst errors = errOf($('Fetch daily roll-ups').all(), reqs.filter(r => r.kind === 'rollup'))\n  .concat(errOf($('Fetch health records').all(), reqs.filter(r => r.kind === 'list')))\n  .filter(Boolean);\nreturn [{ json: {\n  synced_rows: rows.length,\n  errors,\n  window_start: w.window_start,\n  window_end: w.window_end,\n  metrics: [...new Set(rows.map(r => r.metric))],\n} }];"
+      },
+      "id": "f6a737e9-f6bd-48bd-8f10-127a17dfc1fd",
+      "name": "Sync summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "0685ed2d-9652-4cb3-b5a3-171ff5cb3fde",
+      "name": "Called by coach",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -80,
+        -368
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "End of day sync": {
+      "main": [
+        [
+          {
+            "node": "Get last synced sample",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last synced sample": {
+      "main": [
+        [
+          {
+            "node": "Build sync window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build sync window": {
+      "main": [
+        [
+          {
+            "node": "Is daily roll-up?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is daily roll-up?": {
+      "main": [
+        [
+          {
+            "node": "Fetch daily roll-ups",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch health records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch daily roll-ups": {
+      "main": [
+        [
+          {
+            "node": "Collect responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect responses": {
+      "main": [
+        [
+          {
+            "node": "Normalize samples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch health records": {
+      "main": [
+        [
+          {
+            "node": "Collect responses",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Normalize samples": {
+      "main": [
+        [
+          {
+            "node": "Delete stale samples in window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete stale samples in window": {
+      "main": [
+        [
+          {
+            "node": "Restore new samples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore new samples": {
+      "main": [
+        [
+          {
+            "node": "Save samples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save samples": {
+      "main": [
+        [
+          {
+            "node": "Sync summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by coach": {
+      "main": [
+        [
+          {
+            "node": "Get last synced sample",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d049e2b2-0cfa-432b-94b2-8b12d44a0c1b",
+  "meta": {
+    "instanceId": "4cb50b093975c108019206250ad0e591eff83e8f66703bf750de82ea4b4f7a92"
+  },
+  "nodeGroups": [
+    {
+      "id": "d640daad-cab0-47ec-9c45-c3f260c6fd80",
+      "name": "Plan sync window",
+      "nodeIds": [
+        "882d248c-844b-4d85-9c8e-67a96e892391",
+        "76b69b2e-633e-4bef-a5ff-3dc19dc6d673"
+      ],
+      "description": "Starts from the day of the last stored sample (or 7 days back, max 14 days) up to now, one request per metric"
+    },
+    {
+      "id": "dce5e13a-a5c7-4e0b-a046-96ed076dbcad",
+      "name": "Pull health data",
+      "nodeIds": [
+        "e61e464f-e362-423e-87c8-7f8deda68ce0",
+        "7f118552-b60a-4355-b0cb-14148e6d0de6",
+        "747e079b-bcf6-4834-a2b4-5abe6f43c209",
+        "33ff835f-c1fc-485c-9242-d7a3d9eb5781",
+        "e8b2f4ac-830d-4f9c-aef5-2ee5078fea4c"
+      ],
+      "description": "Reads daily activity, heart rate, resting HR, HRV, weight, sleep stages and workouts, then turns them into rows"
+    },
+    {
+      "id": "01a81614-1b52-438c-909d-53b338a5047f",
+      "name": "Store fresh samples",
+      "nodeIds": [
+        "61d4d2c6-c43d-45be-98de-2a64cfc2c197",
+        "319d287b-29d0-4d3b-8ffa-6bf0fd80e2d4",
+        "f55858b1-b70b-4210-8f02-1c90039882a2",
+        "f6a737e9-f6bd-48bd-8f10-127a17dfc1fd"
+      ],
+      "description": "Replaces partial rows from earlier syncs in the same window, so each day ends with its final values"
+    }
+  ],
+  "id": "RjoIq4hgEkFd6z0w",
+  "tags": []
+}
