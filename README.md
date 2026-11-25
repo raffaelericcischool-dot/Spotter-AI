@@ -25,15 +25,12 @@ What does the agent not handle? What inputs break it? What assumptions is it mak
 
 Privacy, bias, transparency, accountability — each with a named concern and a specific design decision you made to address it.
 
-### 1
 
 Spotter AI is a multi-agent assistant, delivered through messaging apps such as Telegram and WhatsApp, that gives athletes personalised guidance on nutrition, sleep, training, scheduling and mental well-being.
 
-### 2
 
 The vast majority of athletes do not have a team that covers every aspect of their lifestyle. From amateurs to professionals, they rarely have specialists on hand to balance training, nutrition, sleep and mental state on a daily basis. The data they do have is usually scattered across wearables, training apps, coaches, clinicians and is rarely brought together. Our tool connects that data and interprets it, turning it into precise guidelines for the athlete to follow. This not only maximises the athlete's potential; it also makes them less vulnerable to physical and mental breakdowns, improving long-term health.
 
-### 3
 
 This is exactly how the assistant works:
 
@@ -60,7 +57,6 @@ This is exactly how the assistant works:
 
 ### ![][image1]
 
-### 4
 
 Google Health Connect is an Android API that runs directly on the user's phone, not in the cloud, and reads smartwatch data such as sleep stages, HRV, resting heart rate and daily steps. In our system this data is read live from the athlete's device and is transmitted only through the athlete's own webhook app, once they have given explicit permission, in line with Google Play's health data policies. Alongside this, Athlete Chat (Training Logs) collects live information typed in by the user, such as workouts, effort levels, injuries, mood and personal preferences. All of this data is processed in accordance with the GDPR, and the athlete remains the only person with access to it.
 
@@ -70,7 +66,7 @@ Medical information comes from Uploaded Medical Records and Lab Results, where a
 
 To keep answers accurate and helpful, we also use SearXNG, a free search engine that can be installed and run locally. It provides the system with live web and news results without the restrictions of commercial API quotas, and it allows the Technical Management Agent to find and attach exercise videos automatically whenever it builds a workout plan. Finally, a static table of reference sources in Supabase serves as a reliable benchmark against which the accuracy and safety of the AI's answers can be checked.
 
-### 5
+
 
 1\. What the Agent Does Not Handle
 
@@ -103,7 +99,7 @@ To keep answers accurate and helpful, we also use SearXNG, a free search engine 
 * T4 – Tool Unavailable: A simulated API failure (an invalid key in n8n) meant the action could not be carried out, and the agent reported this rather than inventing a result. Test passed: the agent should never simulate an API it cannot actually use.  
 * T5 – Calculation Accuracy: Performed a baseline nutrition calculation accurately. Test passed.
 
-### 6 
+
 
 To ensure that our AI coach is safe, fair and reliable, the architecture addresses four key ethical pillars: privacy, bias, transparency and accountability.
 
