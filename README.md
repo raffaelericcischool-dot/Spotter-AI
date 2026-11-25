@@ -1,31 +1,4 @@
 # README
-
-**01**  
-**Project name and one-sentence description.**
-
-What does this agent do, for whom, in one sentence. If you cannot write this sentence, the project scope is still unclear.  
-**02**  
-**The problem being solved.**
-
-Two to three sentences. Who has this problem? What currently happens without the agent? Why does it matter?  
-**03**  
-**How the agent works**
-
-Like a recipe. Input → processing → output. Name every tool called. Name every decision point.  
-**04**  
-**Data sources and APIs used.**
-
-Name every data source. Note whether it is live or simulated. Note the API terms of service — some prohibit commercial use.  
-**05**  
-**Known limitations and edge cases.**
-
-What does the agent not handle? What inputs break it? What assumptions is it making?  
-**06**  
-**Ethics review.**
-
-Privacy, bias, transparency, accountability — each with a named concern and a specific design decision you made to address it.
-
-
 Spotter AI is a multi-agent assistant, delivered through messaging apps such as Telegram and WhatsApp, that gives athletes personalised guidance on nutrition, sleep, training, scheduling and mental well-being.
 
 
